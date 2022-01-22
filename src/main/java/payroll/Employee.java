@@ -6,6 +6,7 @@ import javax.persistence.Id;
 import java.util.Objects;
 
 // this annotation makes the object ready for storage in a JPA-based data store
+// Spring Data JPA repos are interfaces with methods for create, read, update and deleting records
 @Entity
 class Employee {
     // these variables are attributes of Employee domain object
