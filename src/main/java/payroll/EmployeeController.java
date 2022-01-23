@@ -1,9 +1,11 @@
 package payroll;
 
+import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
@@ -21,11 +23,66 @@ class EmployeeController {
 
     // Aggregate root
     // tag::get-aggregate-root[]
-    @GetMapping("/employees")
-    List<Employee> all() {
-        return repository.findAll();
-    }
+//    @GetMapping("/employees")
+//    List<Employee> all() {
+//        return repository.findAll();
+//    }
     // end::get-aggregate-root[]
+
+    @GetMapping("/employees")
+    // CollectionModel is a HATEOAS container for more than one EntityModel
+    CollectionModel<EntityModel<Employee>> all() {
+        // This isn't a simple collection of employees, but a collection of employee resources
+        // so first, we make resources
+        List<EntityModel<Employee>> employees = repository.findAll().stream()
+                .map(employee -> EntityModel.of(employee,
+                        linkTo(methodOn(EmployeeController.class).one(employee.getId())).withSelfRel(),
+                        linkTo(methodOn(EmployeeController.class).all()).withRel("employees")))
+                .collect(Collectors.toList());
+
+        return CollectionModel.of(employees, linkTo(methodOn(EmployeeController.class).all()).withSelfRel());
+    }
+
+    // The top level self with a link to show that the thing is a collection resource itself
+    // _embedded represents HAL collections
+//    {
+//        "_embedded": {
+//        "employeeList": [
+//        {
+//            "id": 1,
+//                "name": "Bilbo Baggins",
+//                "role": "burglar",
+//                "_links": {
+//            "self": {
+//                "href": "http://localhost:8080/employees/1"
+//            },
+//            "employees": {
+//                "href": "http://localhost:8080/employees"
+//            }
+//        }
+//        },
+//        {
+//            "id": 2,
+//                "name": "Frodo Baggins",
+//                "role": "thief",
+//                "_links": {
+//            "self": {
+//                "href": "http://localhost:8080/employees/2"
+//            },
+//            "employees": {
+//                "href": "http://localhost:8080/employees"
+//            }
+//        }
+//        }
+//    ]
+//    },
+//        "_links": {
+//        "self": {
+//            "href": "http://localhost:8080/employees"
+//        }
+//    }
+//    }
+
 
     @PostMapping("/employees")
     Employee newEmployee(@RequestBody Employee newEmployee) {
@@ -71,6 +128,7 @@ class EmployeeController {
 //                }
 //            }
 //        }
+
     }
 
     @PutMapping("/employees/{id}")
