@@ -17,8 +17,11 @@ class EmployeeController {
     // constructor, starts with a EmployeeRepository instance
     private final EmployeeRepository repository;
 
-    EmployeeController(EmployeeRepository repository) {
+    private final EmployeeModelAssembler assembler;
+
+    EmployeeController(EmployeeRepository repository, EmployeeModelAssembler assembler) {
         this.repository = repository;
+        this.assembler = assembler;
     }
 
     // Aggregate root
@@ -29,18 +32,31 @@ class EmployeeController {
 //    }
     // end::get-aggregate-root[]
 
-    @GetMapping("/employees")
-    // CollectionModel is a HATEOAS container for more than one EntityModel
-    CollectionModel<EntityModel<Employee>> all() {
-        // This isn't a simple collection of employees, but a collection of employee resources
-        // so first, we make resources
-        List<EntityModel<Employee>> employees = repository.findAll().stream()
-                .map(employee -> EntityModel.of(employee,
-                        linkTo(methodOn(EmployeeController.class).one(employee.getId())).withSelfRel(),
-                        linkTo(methodOn(EmployeeController.class).all()).withRel("employees")))
-                .collect(Collectors.toList());
+//    @GetMapping("/employees")
+//    // CollectionModel is a HATEOAS container for more than one EntityModel
+//    CollectionModel<EntityModel<Employee>> all() {
+//        // This isn't a simple collection of employees, but a collection of employee resources
+//        // so first, we make resources
+//        List<EntityModel<Employee>> employees = repository.findAll().stream()
+//                .map(employee -> EntityModel.of(employee,
+//                        linkTo(methodOn(EmployeeController.class).one(employee.getId())).withSelfRel(),
+//                        linkTo(methodOn(EmployeeController.class).all()).withRel("employees")))
+//                .collect(Collectors.toList());
+//
+//        return CollectionModel.of(employees, linkTo(methodOn(EmployeeController.class).all()).withSelfRel());
+//    }
 
+    // AGAIN - USE ASSEMBLER INSTEAD TO MAKE PROCESS BETTER
+    // Here we have a method that is going to send back a collection of models
+    // instead we make a list of EntityModels using the assembler and put them in a collection, then return
+    @GetMapping("/employees")
+    CollectionModel<EntityModel<Employee>> all() {
+
+        List<EntityModel<Employee>> employees = repository.findAll().stream()
+                .map(assembler::toModel)
+                .collect(Collectors.toList());
         return CollectionModel.of(employees, linkTo(methodOn(EmployeeController.class).all()).withSelfRel());
+
     }
 
     // The top level self with a link to show that the thing is a collection resource itself
@@ -99,21 +115,21 @@ class EmployeeController {
     // HATEOAS integration
     // The above used simple PRC logic, now we send back hypertext ie: links
     //
-    @GetMapping("/employees/{id}")
-    EntityModel<Employee> one(@PathVariable Long id) {
-
-        Employee employee = repository.findById(id) //
-                .orElseThrow(() -> new EmployeeNotFoundException(id));
-
-        // instead of Employee object from repository it returns a EntityModel of an Employee object
-        // EntityModel is a container from Spring HATEOAS that includes data + links instead of just data
-        return EntityModel.of(employee, //
-                // linkTo(methodOn(EmployeeController.class).one(id)).withSelfRel() asks that Spring HATEOAS build a link to the EmployeeController 's one() method, and flag it as a self link.
-                linkTo(methodOn(EmployeeController.class).one(id)).withSelfRel(),
-                // linkTo(methodOn(EmployeeController.class).all()).withRel("employees") asks Spring HATEOAS to build a link to the aggregate root, all(), and call it "employees".
-                linkTo(methodOn(EmployeeController.class).all()).withRel("employees"));
-                // building "links" with URI + relationship are what empowers the web
-
+//    @GetMapping("/employees/{id}")
+//    EntityModel<Employee> one(@PathVariable Long id) {
+//
+//        Employee employee = repository.findById(id) //
+//                .orElseThrow(() -> new EmployeeNotFoundException(id));
+//
+//        // instead of Employee object from repository it returns a EntityModel of an Employee object
+//        // EntityModel is a container from Spring HATEOAS that includes data + links instead of just data
+//        return EntityModel.of(employee, //
+//                // linkTo(methodOn(EmployeeController.class).one(id)).withSelfRel() asks that Spring HATEOAS build a link to the EmployeeController 's one() method, and flag it as a self link.
+//                linkTo(methodOn(EmployeeController.class).one(id)).withSelfRel(),
+//                // linkTo(methodOn(EmployeeController.class).all()).withRel("employees") asks Spring HATEOAS to build a link to the aggregate root, all(), and call it "employees".
+//                linkTo(methodOn(EmployeeController.class).all()).withRel("employees"));
+//                // building "links" with URI + relationship are what empowers the web
+//
 // SAMPLE RESTful response to a single employee
 //        {
 //            "id": 1,
@@ -129,6 +145,16 @@ class EmployeeController {
 //            }
 //        }
 
+//    }
+
+    // integrating assembler that was built out so that we can get models of Employee instead of creating Entity every time
+    @GetMapping("/employees/{id}")
+    EntityModel<Employee> one(@PathVariable Long id) {
+
+        Employee employee = repository.findById(id)
+                .orElseThrow(() -> new EmployeeNotFoundException(id));
+
+        return assembler.toModel(employee);
     }
 
     @PutMapping("/employees/{id}")
